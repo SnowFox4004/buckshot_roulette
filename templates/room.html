@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Buckshot Roulette - 房间</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: "Arial", sans-serif;
+        background-color: #121212;
+        color: #e0e0e0;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+      }
+
+      .container {
+        max-width: 800px;
+        width: 100%;
+      }
+
+      h1,
+      h2 {
+        text-align: center;
+        color: #ff5252;
+      }
+
+      .btn {
+        background-color: #ff5252;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        margin: 5px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background-color 0.3s;
+      }
+
+      .btn:hover {
+        background-color: #ff0000;
+      }
+
+      .btn-secondary {
+        background-color: #444;
+      }
+
+      .btn-secondary:hover {
+        background-color: #666;
+      }
+
+      #message-box {
+        background-color: #1e1e1e;
+        border: 1px solid #444;
+        border-radius: 5px;
+        padding: 15px;
+        margin: 20px 0;
+        height: 150px;
+        overflow-y: auto;
+      }
+
+      .message {
+        margin-bottom: 8px;
+      }
+
+      .player-list {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin: 20px 0;
+      }
+
+      .player-card {
+        background-color: #1e1e1e;
+        border: 1px solid #444;
+        border-radius: 5px;
+        padding: 10px;
+        margin: 5px;
+        width: 150px;
+        text-align: center;
+      }
+
+      .player-emoji {
+        font-size: 32px;
+        margin: 10px 0;
+      }
+
+      .player-health {
+        display: flex;
+        justify-content: center;
+      }
+
+      .health-point {
+        width: 15px;
+        height: 15px;
+        background-color: #ff5252;
+        border-radius: 50%;
+        margin: 0 3px;
+      }
+
+      .health-point.empty {
+        background-color: #444;
+      }
+
+      .game-board {
+        display: none;
+        position: relative;
+        width: 100%;
+        height: 500px;
+        background-color: #1e1e1e;
+        border-radius: 10px;
+        margin: 20px 0;
+        overflow: hidden;
+      }
+
+      .gun-container {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+      }
+
+      .gun {
+        font-size: 64px;
+        cursor: pointer;
+      }
+
+      .bullets-info {
+        font-size: 14px;
+        margin-top: 10px;
+      }
+
+      .player-position {
+        position: absolute;
+        width: 150px;
+        text-align: center;
+      }
+
+      .player-position.top {
+        top: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      .player-position.right {
+        top: 50%;
+        right: 20px;
+        transform: translateY(-50%);
+      }
+
+      .player-position.bottom {
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+      }
+
+      .player-position.left {
+        top: 50%;
+        left: 20px;
+        transform: translateY(-50%);
+      }
+
+      .items-container {
+        display: flex;
+        justify-content: center;
+        margin-top: 10px;
+      }
+
+      .item {
+        background-color: #333;
+        border: 1px solid #444;
+        border-radius: 5px;
+        padding: 5px 10px;
+        margin: 0 5px;
+        cursor: pointer;
+      }
+
+      .item:hover {
+        background-color: #444;
+      }
+
+      .current-player {
+        border: 2px solid #ff5252;
+      }
+
+      .dealer {
+        background-color: #2c3e50;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      #game-log {
+        background-color: rgba(0, 0, 0, 0.7);
+        color: #fff;
+        padding: 10px;
+        border-radius: 5px;
+        margin-top: 20px;
+        max-height: 150px;
+        overflow-y: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Buckshot Roulette</h1>
+
+      <!-- 房间页面 -->
+      <div id="room-screen">
+        <h2>房间: <span id="room-id-display"></span></h2>
+        <div id="room-controls" style="text-align: center">
+          <button class="btn" id="start-game-btn">开始游戏</button>
+          <button class="btn btn-secondary" id="leave-room-btn">
+            离开房间
+          </button>
+        </div>
+
+        <h3>玩家列表</h3>
+        <div class="player-list" id="player-list">
+          <!-- 玩家列表将在这里动态生成 -->
+        </div>
+
+        <div id="message-box">
+          <!-- 消息将在这里显示 -->
+        </div>
+      </div>
+
+      <!-- 游戏页面 -->
+      <div id="game-screen" class="hidden">
+        <div class="game-board" id="game-board">
+          <div class="player-position top" id="position-top">
+            <!-- 上方玩家 -->
+          </div>
+          <div class="player-position right" id="position-right">
+            <!-- 右方玩家 -->
+          </div>
+          <div class="player-position bottom" id="position-bottom">
+            <!-- 下方玩家 -->
+          </div>
+          <div class="player-position left" id="position-left">
+            <!-- 左方玩家 -->
+          </div>
+
+          <div class="gun-container">
+            <div class="gun" id="gun">🔫</div>
+            <div class="bullets-info" id="bullets-info">剩余子弹: 0</div>
+          </div>
+        </div>
+
+        <div id="game-log">
+          <!-- 游戏日志将在这里显示 -->
+        </div>
+
+        <div style="text-align: center; margin-top: 20px">
+          <button class="btn btn-secondary" id="back-to-room-btn">
+            返回房间
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // 全局变量
+      let socket = io();
+      let currentRoom = null;
+      let currentPlayerId = null;
+      let isMyTurn = false;
+      let gameState = null;
+
+      // 获取房间ID和玩家名字
+      const roomId = window.location.pathname.split("/").pop();
+      const urlParams = new URLSearchParams(window.location.search);
+      const playerName =
+        urlParams.get("name") || "游客" + Math.floor(Math.random() * 1000);
+
+      // 初始化
+      document.addEventListener("DOMContentLoaded", () => {
+        // 设置Socket.IO处理程序
+        socket = setupSocketHandlers(socket);
+
+        // 显示房间ID
+        document.getElementById("room-id-display").textContent = roomId;
+
+        // 初始化事件监听器
+        document
+          .getElementById("leave-room-btn")
+          .addEventListener("click", leaveRoom);
+        document
+          .getElementById("start-game-btn")
+          .addEventListener("click", startGameRequest);
+        document
+          .getElementById("back-to-room-btn")
+          .addEventListener("click", backToRoom);
+        document.getElementById("gun").addEventListener("click", useGun);
+
+        // 自动加入房间
+        joinRoom();
+      });
+
+      // 单一的Socket.IO处理函数
+      function setupSocketHandlers(socket) {
+        socket.on("connect", () => {
+          console.log("Connected to server");
+          addMessage("已连接到服务器");
+        });
+
+        socket.on("disconnect", () => {
+          console.log("Disconnected from server");
+          addMessage("与服务器断开连接");
+          window.location.href = "/";
+        });
+
+        socket.on("error", (data) => {
+          console.error("Error:", data.message);
+          addMessage("错误: " + data.message);
+        });
+
+        socket.on("joined_room", (data) => {
+          console.log("Joined room:", data);
+          joinedRoom(data);
+        });
+
+        socket.on("player_joined", (player) => {
+          console.log("Player joined:", player);
+          addMessage(`${player.name} 加入了房间`);
+          updatePlayersList(player, "add");
+        });
+
+        socket.on("player_left", (player) => {
+          console.log("Player left:", player);
+          addMessage(`${player.name} 离开了房间`);
+          updatePlayersList(player, "remove");
+        });
+
+        socket.on("room_updated", (room) => {
+          console.log("Room updated:", room);
+          updateRoom(room);
+        });
+
+        socket.on("game_started", (gameState) => {
+          console.log("Game started:", gameState);
+          startGame(gameState);
+        });
+
+        socket.on("game_updated", (data) => {
+          console.log("Game updated:", data);
+          updateGame(data);
+        });
+
+        socket.on("game_ended", (data) => {
+          console.log("Game ended:", data);
+          endGame(data);
+        });
+
+        socket.on("left_room", (data) => {
+          console.log("Left room:", data);
+          window.location.href = "/";
+        });
+
+        return socket;
+      }
+
+      // 辅助函数
+      function showScreen(screenId) {
+        // 隐藏所有屏幕
+        document.getElementById("room-screen").classList.add("hidden");
+        document.getElementById("game-screen").classList.add("hidden");
+
+        // 显示指定的屏幕
+        document.getElementById(screenId).classList.remove("hidden");
+
+        if (screenId === "game-screen") {
+          document.getElementById("game-board").style.display = "block";
+        }
+      }
+
+      function addMessage(message) {
+        const messageBox = document.getElementById("message-box");
+        const messageElement = document.createElement("div");
+        messageElement.className = "message";
+        messageElement.textContent = message;
+        messageBox.appendChild(messageElement);
+        messageBox.scrollTop = messageBox.scrollHeight;
+      }
+
+      function addGameLog(message) {
+        const gameLog = document.getElementById("game-log");
+        const logElement = document.createElement("div");
+        logElement.textContent = message;
+        gameLog.appendChild(logElement);
+        gameLog.scrollTop = gameLog.scrollHeight;
+      }
+
+      // 房间相关函数
+      function joinRoom() {
+        socket.emit("join_room", {
+          room_id: roomId,
+          name: playerName,
+        });
+      }
+
+      function joinedRoom(data) {
+        currentRoom = data.room;
+        currentPlayerId = data.player.id;
+
+        // 更新玩家列表
+        updateRoom(currentRoom);
+
+        addMessage(`欢迎来到房间 ${currentRoom.id}`);
+      }
+
+      function updateRoom(room) {
+        // 清空玩家列表
+        const playerList = document.getElementById("player-list");
+        playerList.innerHTML = "";
+
+        // 添加所有玩家
+        room.players.forEach((player) => {
+          addPlayerToList(player, player.id === room.owner_id);
+        });
+
+        // 更新开始游戏按钮，只有房主可见
+        const startGameBtn = document.getElementById("start-game-btn");
+        if (currentPlayerId === room.owner_id) {
+          startGameBtn.style.display = "inline-block";
+        } else {
+          startGameBtn.style.display = "none";
+        }
+
+        // 更新当前房间
+        currentRoom = room;
+      }
+
+      function updatePlayersList(player, action) {
+        if (action === "add") {
+          // 检查玩家是否已在列表中
+          const existingPlayer = document.getElementById(`player-${player.id}`);
+          if (!existingPlayer) {
+            addPlayerToList(player, player.id === currentRoom.owner_id);
+          }
+        } else if (action === "remove") {
+          // 从列表中移除玩家
+          const playerElement = document.getElementById(`player-${player.id}`);
+          if (playerElement) {
+            playerElement.remove();
+          }
+        }
+      }
+
+      function addPlayerToList(player, isOwner) {
+        const playerList = document.getElementById("player-list");
+        const playerCard = document.createElement("div");
+        playerCard.className = "player-card";
+        playerCard.id = `player-${player.id}`;
+
+        const ownerBadge = isOwner ? " 👑" : "";
+
+        playerCard.innerHTML = `
+                <div class="player-emoji">${player.emoji}</div>
+                <div>${player.name}${ownerBadge}</div>
+            `;
+
+        playerList.appendChild(playerCard);
+      }
+
+      function leaveRoom() {
+        if (currentRoom) {
+          socket.emit("leave_room", {
+            room_id: currentRoom.id,
+          });
+        }
+      }
+
+      function startGameRequest() {
+        if (currentRoom) {
+          socket.emit("start_game", {
+            room_id: currentRoom.id,
+          });
+        }
+      }
+
+      function backToRoom() {
+        if (currentRoom) {
+          showScreen("room-screen");
+        }
+      }
+
+      // 游戏相关函数
+      function startGame(initialGameState) {
+        gameState = initialGameState;
+        showScreen("game-screen");
+
+        // 清空游戏日志
+        document.getElementById("game-log").innerHTML = "";
+        addGameLog("游戏开始！");
+
+        // 渲染游戏
+        renderGame();
+      }
+
+      function renderGame() {
+        if (!gameState) return;
+
+        // 更新子弹信息
+        document.getElementById(
+          "bullets-info"
+        ).textContent = `剩余子弹: ${gameState.remaining_bullets}`;
+
+        // 清空所有位置
+        const positions = ["top", "right", "bottom", "left"];
+        positions.forEach((pos) => {
+          document.getElementById(`position-${pos}`).innerHTML = "";
+        });
+
+        // 根据玩家数量分配位置
+        const playerCount = gameState.players.length;
+        let posIndex = 0;
+
+        gameState.players.forEach((player) => {
+          const isCurrent = player.id === gameState.current_player;
+          const isDealer = player.id === gameState.dealer;
+
+          // 选择位置
+          let position;
+          if (player.id === currentPlayerId) {
+            position = "bottom"; // 当前玩家总是在底部
+          } else {
+            if (playerCount <= 2) {
+              position = "top"; // 只有一个对手时，放在上方
+            } else {
+              // 2个或3个对手时，分配到上、左、右
+              position = positions[posIndex];
+              if (position === "bottom") posIndex++; // 跳过底部位置
+              posIndex++;
+            }
+          }
+
+          // 创建玩家元素
+          const playerElement = document.createElement("div");
+          playerElement.className = `player-card ${
+            isCurrent ? "current-player" : ""
+          } ${isDealer ? "dealer" : ""}`;
+          playerElement.setAttribute("data-player-id", player.id);
+
+          let healthHTML = "";
+          for (let i = 0; i < 4; i++) {
+            healthHTML += `<div class="health-point ${
+              i < player.health ? "" : "empty"
+            }"></div>`;
+          }
+
+          // 道具展示
+          let itemsHTML = "";
+          if (player.items.length > 0) {
+            itemsHTML = '<div class="items-container">';
+            player.items.forEach((item, index) => {
+              // 只有当前回合的玩家可以使用自己的道具
+              const canUse = player.id === currentPlayerId && isCurrent;
+              itemsHTML += `<div class="item" ${
+                canUse ? `onclick="useItem(${index})"` : ""
+              }>${item}</div>`;
+            });
+            itemsHTML += "</div>";
+          }
+
+          playerElement.innerHTML = `
+                    <div class="player-emoji">${player.emoji}</div>
+                    <div>${player.name}</div>
+                    <div class="player-health">${healthHTML}</div>
+                    ${itemsHTML}
+                `;
+
+          // 如果是当前回合的对手，添加点击事件
+          if (isCurrent && player.id !== currentPlayerId) {
+            playerElement.style.cursor = "pointer";
+            playerElement.addEventListener("click", () => {
+              targetPlayer(player.id);
+            });
+          }
+
+          // 添加到对应的位置
+          document
+            .getElementById(`position-${position}`)
+            .appendChild(playerElement);
+        });
+
+        // 更新是否是我的回合
+        isMyTurn = gameState.current_player === currentPlayerId;
+
+        // 更新枪的状态
+        const gun = document.getElementById("gun");
+        gun.style.cursor = isMyTurn ? "pointer" : "default";
+      }
+
+      function useItem(itemIndex) {
+        if (!isMyTurn || !currentRoom) return;
+
+        socket.emit("use_item", {
+          room_id: currentRoom.id,
+          item_index: itemIndex,
+        });
+      }
+
+      function useGun() {
+        if (!isMyTurn || !currentRoom) return;
+
+        // 当前玩家决定朝谁开枪
+        const targetContainer = document.createElement("div");
+        targetContainer.innerHTML = "<p>选择目标:</p>";
+
+        gameState.players.forEach((player) => {
+          if (player.id !== currentPlayerId) {
+            const btn = document.createElement("button");
+            btn.className = "btn";
+            btn.textContent = player.name;
+            btn.onclick = () => targetPlayer(player.id);
+            targetContainer.appendChild(btn);
+          }
+        });
+
+        // 自杀选项
+        const selfBtn = document.createElement("button");
+        selfBtn.className = "btn btn-secondary";
+        selfBtn.textContent = "对自己开枪";
+        selfBtn.onclick = () => targetPlayer(currentPlayerId);
+        targetContainer.appendChild(selfBtn);
+
+        // 显示选择框
+        const gameLog = document.getElementById("game-log");
+        gameLog.appendChild(targetContainer);
+        gameLog.scrollTop = gameLog.scrollHeight;
+      }
+
+      function targetPlayer(targetId) {
+        if (!isMyTurn || !currentRoom) return;
+
+        socket.emit("pull_trigger", {
+          room_id: currentRoom.id,
+          target_id: targetId,
+        });
+      }
+
+      function updateGame(data) {
+        gameState = data.game_state;
+
+        // 添加结果到游戏日志
+        addGameLog(data.result);
+
+        // 重新渲染游戏
+        renderGame();
+
+        // 如果有玩家死亡，显示提示
+        if (data.result.includes("已经死亡")) {
+          addGameLog("有玩家死亡！");
+        }
+
+        // 如果游戏结束，显示提示
+        if (data.result.includes("游戏结束")) {
+          addGameLog("游戏结束！");
+        }
+      }
+
+      function endGame(data) {
+        addGameLog(data.result);
+        addGameLog(`游戏结束！${data.winner.name} 获胜！`);
+
+        // 5秒后返回房间
+        setTimeout(() => {
+          showScreen("room-screen");
+          updateRoom(data.room);
+          location.reload();
+        }, 5000);
+      }
+    </script>
+  </body>
+</html>

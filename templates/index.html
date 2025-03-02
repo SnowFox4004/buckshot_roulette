@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Buckshot Roulette</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js"></script>
+    <style>
+      body {
+        font-family: "Arial", sans-serif;
+        background-color: #121212;
+        color: #e0e0e0;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        min-height: 100vh;
+      }
+
+      .container {
+        max-width: 800px;
+        width: 100%;
+      }
+
+      h1,
+      h2 {
+        text-align: center;
+        color: #ff5252;
+      }
+
+      .btn {
+        background-color: #ff5252;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        margin: 5px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background-color 0.3s;
+      }
+
+      .btn:hover {
+        background-color: #ff0000;
+      }
+
+      .input-group {
+        margin: 20px 0;
+      }
+
+      input {
+        padding: 10px;
+        font-size: 16px;
+        border: 1px solid #444;
+        background-color: #333;
+        color: #e0e0e0;
+        border-radius: 5px;
+        margin-right: 10px;
+        width: 70%;
+      }
+
+      #message-box {
+        background-color: #1e1e1e;
+        border: 1px solid #444;
+        border-radius: 5px;
+        padding: 15px;
+        margin: 20px 0;
+        height: 150px;
+        overflow-y: auto;
+      }
+
+      .message {
+        margin-bottom: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Buckshot Roulette</h1>
+
+      <!-- 主页 -->
+      <div id="home-screen">
+        <div class="input-group">
+          <input type="text" id="player-name" placeholder="输入您的名字" />
+        </div>
+        <div style="text-align: center">
+          <button class="btn" id="create-room-btn">创建房间</button>
+          <div class="input-group">
+            <input type="text" id="join-room-id" placeholder="输入房间ID" />
+            <button class="btn" id="join-room-btn">加入房间</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="message-box">
+        <!-- 消息将在这里显示 -->
+      </div>
+    </div>
+
+    <script>
+      // 全局变量
+      let socket = io();
+
+      // 初始化
+      document.addEventListener("DOMContentLoaded", () => {
+        // 设置Socket.IO处理程序
+        setupSocketHandlers(socket);
+
+        // 初始化事件监听器
+        document
+          .getElementById("create-room-btn")
+          .addEventListener("click", createRoom);
+        document
+          .getElementById("join-room-btn")
+          .addEventListener("click", joinRoom);
+
+        // 检查URL中是否有房间ID
+        const urlParams = new URLSearchParams(window.location.search);
+        const roomId = urlParams.get("room");
+
+        if (roomId) {
+          document.getElementById("join-room-id").value = roomId;
+        }
+      });
+
+      // 单一的Socket.IO处理函数
+      function setupSocketHandlers(socket) {
+        socket.on("connect", () => {
+          console.log("Connected to server");
+          addMessage("已连接到服务器");
+        });
+
+        socket.on("disconnect", () => {
+          console.log("Disconnected from server");
+          addMessage("与服务器断开连接");
+        });
+
+        socket.on("error", (data) => {
+          console.error("Error:", data.message);
+          addMessage("错误: " + data.message);
+        });
+
+        return socket;
+      }
+
+      function addMessage(message) {
+        const messageBox = document.getElementById("message-box");
+        const messageElement = document.createElement("div");
+        messageElement.className = "message";
+        messageElement.textContent = message;
+        messageBox.appendChild(messageElement);
+        messageBox.scrollTop = messageBox.scrollHeight;
+      }
+
+      function createRoom() {
+        const playerName =
+          document.getElementById("player-name").value ||
+          "游客" + Math.floor(Math.random() * 1000);
+
+        // 转向后端的create_room路由
+        window.location.href = `/create_room?name=${encodeURIComponent(
+          playerName
+        )}`;
+      }
+
+      function joinRoom() {
+        const playerName =
+          document.getElementById("player-name").value ||
+          "游客" + Math.floor(Math.random() * 1000);
+        const roomId = document.getElementById("join-room-id").value;
+
+        if (!roomId) {
+          alert("请输入房间ID");
+          return;
+        }
+
+        // 直接跳转到房间页面
+        window.location.href = `/room/${roomId}?name=${encodeURIComponent(
+          playerName
+        )}`;
+      }
+    </script>
+  </body>
+</html>
