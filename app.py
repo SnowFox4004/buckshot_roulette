@@ -46,6 +46,7 @@ class Room:
         if len(self.players) > 0:
             self.status = "playing"
             self.game = Game(self.players)
+            self.game.room = self
             return True
         return False
 
@@ -113,6 +114,12 @@ class Game:
         self.bullets = ["live"] * live_bullets + ["blank"] * blank_bullets
         random.shuffle(self.bullets)
         self.remaining_bullets = self.bullets.copy()
+        if hasattr(self, "room"):
+            socketio.emit(
+                "game_updated",
+                {"action": "reload", "live": live_bullets, "blank": blank_bullets},
+                to=self.room.id,
+            )
 
     def initialize_items(self):
         # 创建道具牌组
@@ -434,4 +441,4 @@ def on_pull_trigger(data):
 
 
 if __name__ == "__main__":
-    socketio.run(app, debug=True)
+    socketio.run(app, debug=True, host="0.0.0.0", port=5000)
