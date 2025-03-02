@@ -82,7 +82,7 @@ class Game:
     def __init__(self, player_ids):
         self.players = player_ids
         self.current_player_index = 0
-        self.dealer_index = len(player_ids) - 1  # 最后一个玩家默认为庄家
+        self.dealer_index = 0  # 最后一个玩家默认为庄家
         self.bullets = []
         self.remaining_bullets = []
         self.items_deck = []
@@ -148,41 +148,48 @@ class Game:
         player = players[player_id]
         if 0 <= item_index < len(player.items):
             item = player.items.pop(item_index)
-
+            result = ""
             # 处理各种道具效果
             if item == "香烟":
                 player.health = min(player.health + 1, 4)
-                return f"{player.name} 使用了香烟，恢复了1点生命值"
+                result = f"{player.name} 使用了香烟，恢复了1点生命值"
 
             elif item == "放大镜":
                 if self.remaining_bullets:
-                    return f"{player.name} 使用了放大镜，查看到下一颗子弹是 {'致命的' if self.remaining_bullets[0] == 'live' else '空的'}"
-                return f"{player.name} 使用了放大镜，但枪里没有子弹了"
+                    result = f"{player.name} 使用了放大镜，查看到下一颗子弹是 {'致命的' if self.remaining_bullets[0] == 'live' else '空的'}"
+                else:
+                    result = f"{player.name} 使用了放大镜，但枪里没有子弹了"
 
             elif item == "手铐":
                 # self.next_turn()  # 直接跳过下一个玩家的回合
                 self.handcuffs_reg()
-                return f"{player.name} 使用了手铐，跳过了下一个玩家的回合"
+                result = f"{player.name} 使用了手铐，跳过了下一个玩家的回合"
 
             elif item == "啤酒":
                 if self.remaining_bullets:
                     # 移除下一颗子弹
                     removed_bullet = self.remaining_bullets.pop(0)
-                    return f"{player.name} 使用了啤酒，移除了一颗{'致命' if removed_bullet == 'live' else '空'}子弹"
-                return f"{player.name} 使用了啤酒，但枪里没有子弹了"
+                    result = f"{player.name} 使用了啤酒，移除了一颗{'致命' if removed_bullet == 'live' else '空'}子弹"
+                else:
+                    result = f"{player.name} 使用了啤酒，但枪里没有子弹了"
 
             elif item == "锯子":
                 # 伤害翻倍
                 self.saw_reg()
-                return f"{player.name} 使用了锯子，下一次的射击伤害翻倍"
+                result = f"{player.name} 使用了锯子，下一次的射击伤害翻倍"
 
-            return f"{player.name} 使用了未知道具"
+            # result = f"{player.name} 使用了未知道具"
+            if not self.remaining_bullets:
+                self.load_gun()
+                self.deal_items()
+
+            return result
 
     def pull_trigger(self, target_id, player_id):
         print(f"{player_id} 开枪射击 {target_id}")
 
         if not self.remaining_bullets:
-            return "枪里没有子弹了", False  # 添加布尔值返回
+            return "枪里没有子弹了", False, True  # 添加布尔值返回
 
         bullet = self.remaining_bullets.pop(0)
         target = players[target_id]
